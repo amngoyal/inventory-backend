@@ -19,21 +19,36 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 
-app.post('/add-product', (request, response) => {
+app.post('/add-product', async (request, response) => {
     const { productId, productName, manufacturer,
         category, reOrderQty, supplier, moq, leadTime, orderedQty, qtySold } = request.body;
+    try {
 
-    products({
-        productId, productName, manufacturer, category, reOrderQty
-    }).save((err, result) => {
-        if (err) {
-            console.log(err);
-            response.status(500).send(err);
-        }
-        console.log(result)
-        response.status(201).send(result);
-    })
+        let productsRes = await products({
+            productId, productName, manufacturer, category, reOrderQty
+        }).save();
 
+        console.log(productsRes)
+
+        let supplierRes = await suppliers({
+            productId, productName, manufacturer, supplier, moq, leadTime
+        }).save();
+
+        console.log(supplierRes)
+
+
+        const balance = parseInt(orderedQty) - parseInt(qtySold)
+        let stockRes = await stock({
+            productId, productName, manufacturer, orderedQty, qtySold, balance
+        }).save();
+
+        console.log(stockRes);
+
+        response.status(201).send("Added Successfully");
+    }
+    catch (e) {
+        response.status(500).send("Intersnal server error");
+    }
 })
 
 // ------------------------- Products -----------------------------

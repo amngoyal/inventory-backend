@@ -99,16 +99,23 @@ app.post('/update-product', async (request, response) => {
 })
 
 app.post('/delete-product', (req, res) => {
-    const { objectId } = req.body;
+    const { objectId, productId } = req.body;
     console.log("deletion", objectId)
 
     products.deleteOne({ _id: ObjectID(objectId) })
-        .then(result => {
-            res.status(200).send("product delete successfully")
+        .then(async result => {
+            try {
+                await stock.deleteOne({ productId })
+                await por.deleteOne({ productId });
+                res.status(201).send("done")
+            } catch (e) {
+                return res.status(500).send(e)
+            }
         })
         .catch(err => {
             res.status(500).send(err)
         })
+
 })
 
 // ----------------------------- Suppliers -----------------------------

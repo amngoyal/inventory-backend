@@ -78,13 +78,23 @@ app.post('/update-product', async (request, response) => {
     const { objectId, updatedData } = request.body;
     console.log(objectId, updatedData);
 
-    products.updateOne({ _id: ObjectID(objectId) }, { $set: updatedData }, (err, result) => {
+    products.updateOne({ _id: ObjectID(objectId) }, { $set: updatedData }, async (err, result) => {
         if (err)
             return response.status(500).send(err);
 
+        let { productName, manufacturer, reOrderQty } = updatedData
+        let supplierRes = await suppliers.updateOne({ productId: updatedData.productId }, { $set: { productName, manufacturer } })
+        let stockRes = await stock.updateOne({ productId: updatedData.productId }, { $set: { productName, manufacturer } })
+        let porRes = await por.updateOne({ productId: updatedData.productId }, { $set: { productName, manufacturer, reOrderQty } })
+
+
         console.log("product updated successfully")
         return response.status(201).send("product updated successfully")
+    }).catch(err => {
+        console.log(err);
     })
+
+
 
 })
 

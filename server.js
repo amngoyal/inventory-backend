@@ -116,6 +116,21 @@ app.get('/get-suppliers', (request, response) => {
 
 })
 
+app.post('/add-supplier', (request, response) => {
+
+    console.log(request.body.newSupplier)
+    const { productId, productName, manufacturer, supplier, leadTime, moq } = request.body.newSupplier;
+    suppliers({
+        productId, productName, manufacturer, supplier, leadTime, moq
+    }).save()
+        .then(res => {
+            return response.status(201).send("New supplier created")
+        })
+        .catch(err => {
+            return response.status(500).send("error in creating new supplier");
+        })
+})
+
 app.post('/update-supplier', async (request, response) => {
     const { objectId, updatedData } = request.body;
     console.log(objectId, updatedData);

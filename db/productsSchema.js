@@ -6,7 +6,12 @@ const products = new mongoose.Schema({
     productName: String,
     manufacturer: String,
     category: String,
-    reOrderQty: Number
+    reOrderQty: Number,
+    supplier: String,
+    moq: Number,
+    leadTime: Number,
+    orderedQty: Number,
+    qtySold: Number
 });
 
 module.exports = productsSchema = mongoose.model('products', products);

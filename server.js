@@ -1,13 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-
 const connectDB = require('./db/connection');
 var ObjectID = require('mongodb').ObjectID;
 const users = require('./db/usersSchema');
 const products = require('./db/productsSchema');
 const stock = require('./db/stockSchema');
-const purchaseOrderReport = require('./db/purchaseOrderReportSchema');
+const por = require('./db/porSchema.js');
 const suppliers = require('./db/suppliersSchema');
 
 const app = express();
@@ -24,11 +23,9 @@ app.post('/add-product', async (request, response) => {
         category, reOrderQty, supplier, moq, leadTime, orderedQty, qtySold } = request.body;
     try {
 
-        let productsRes = await products({
-            productId, productName, manufacturer, category, reOrderQty
-        }).save();
+        let productRes = await products(request.body).save();
 
-        console.log(productsRes)
+        console.log(productRes)
 
         let supplierRes = await suppliers({
             productId, productName, manufacturer, supplier, moq, leadTime
@@ -44,10 +41,21 @@ app.post('/add-product', async (request, response) => {
 
         console.log(stockRes);
 
-        response.status(201).send("Added Successfully");
+        return response.status(201).send("Added Successfully");
     }
     catch (e) {
-        response.status(500).send("Intersnal server error");
+
+        if (productRes._id) {
+            products.remove({ _id: ObjectID(productRes._id) })
+        }
+        if (supplierRes._id) {
+            supplier.remove({ _id: ObjectID(supplierRes._id) })
+        }
+        if (productsRes._id) {
+            stock.remove({ _id: ObjectID(stockRes._id) })
+        }
+
+        return response.status(500).send("Intersnal server error");
     }
 })
 
@@ -56,9 +64,10 @@ app.get('/get-products', (request, response) => {
 
     console.log("get-products")
 
-    products.find().then(result => {
-        return response.status(200).send(result);
-    })
+    products.find()
+        .then(result => {
+            return response.status(200).send(result);
+        })
         .catch(err => {
             console.log(err)
         })
@@ -158,9 +167,109 @@ app.post('/update-stock', async (request, response) => {
             return response.status(500).send(err);
 
         console.log("stock updated successfully")
-        return response.status(201).send("stock updated successfully")
+
+        products.find({ productId: updatedData.productId }).then(result => {
+            console.log(result)
+            const { productId, productName, manufacturer, reOrderQty } = result[0];
+            const { balance } = updatedData
+            if (updatedData.balance <= reOrderQty) {
+
+                suppliers.find({ productId }).then(supp => {
+
+                    if (supp[0]) {
+
+                        let allSuppliers = []
+                        supp.forEach(el => {
+                            const { supplier, moq, leadTime } = el;
+                            allSuppliers.push({
+                                supplier, moq, leadTime
+                            })
+                        })
+
+                        por.find({ productId }).then(el => {
+                            if (el[0]) {
+                                por.updateOne({ productId }, {
+                                    $set: {
+                                        productId, productName, manufacturer, reOrderQty, balance, allSuppliers
+                                    }
+                                }).then(res => {
+                                    response.status(200).send("por existed and updated")
+                                })
+                            }
+                            else {
+                                por({
+                                    productId, productName, manufacturer, reOrderQty, balance, allSuppliers
+                                }).save()
+                                    .then(() => {
+                                        return response.status(201).send("purchase order created")
+                                    })
+                                    .catch(err => {
+                                        return response.status(500).send("unable to create purchase order")
+                                    })
+                            }
+                        }
+                        )
+
+                    }
+
+                })
+
+            }
+            else {
+                return response.status(201).send("stock updated successfully")
+            }
+        }).catch(err => {
+            console.log(err)
+        })
+
     })
 
+})
+
+app.get('/get-purchase-report', (request, response) => {
+
+    console.log("get-por")
+
+    por.find()
+        .then(result => {
+            return response.status(200).send(result);
+        })
+        .catch(err => {
+            return response.status(500).send(err)
+        })
+
+})
+
+
+app.post('/create-por', (request, response) => {
+
+    console.log("create-por")
+    const { productId, productName, manufacturer, reOrderQty, balance, allSuppliers } = request.body;
+
+    por({
+        productId, productName, manufacturer, reOrderQty, balance, allSuppliers
+    }).save()
+        .then(() => {
+            return response.status(201).send("purchase order created")
+        })
+        .catch(err => {
+            return response.status(500).send("unable to create purchase order")
+        })
+})
+
+app.post('/delete-por', (request, response) => {
+    console.log("delete por", request.body.productId)
+
+
+    por.remove({ productId: request.body.productId })
+        .then(res => {
+            console.log(res)
+            return response.status(201).send("por deleted")
+        })
+        .catch(err => {
+            console.log(err)
+            return response.status(500).send(err)
+        })
 })
 
 app.post('/login', (req, res, next) => {
